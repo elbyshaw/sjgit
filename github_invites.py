@@ -7,8 +7,8 @@ import json
 
 ## =========== USER DEFINES ============= ##
 
-team_names = ['pd'] # can take multiple teams
-id_type = 'gt_id' # choose gt_email or gt_id
+team_names = ['fall26_digital_onboarding_phase_1', 'fall26_analog_onboarding'] # can take multiple teams
+id_type = 'gt_username' # choose gt_email or gt_username
 
 ## ====================================== ##
 
@@ -76,7 +76,7 @@ def readCSV():
 				log.write(f"WARNING: Non GT Email skipped: {usernamelist[i]}\n")
 				continue
 		# otherwise, just ingest all usernames
-		elif id_type == 'gt_id':
+		elif id_type == 'gt_username':
 			user = usernamelist[i]
 	return usernamelist
 	log.close()
