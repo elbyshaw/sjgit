@@ -7,7 +7,7 @@ import json
 
 ## =========== USER DEFINES ============= ##
 
-team_names = ['pd'] # can take multiple teams
+team_names = ['fall26_digital_onboarding_phase_2'] # can take multiple teams
 id_type = 'gt_id' # choose gt_email or gt_id
 
 ## ====================================== ##
@@ -20,6 +20,9 @@ def main():
 		exit(1)
 
 	user_list = readCSV()
+	if len(user_list) == 0:
+		print("No users in the csv file; nothing to do.")
+		exit(0)
 	successes = 0
 	fails = 0
 
@@ -58,28 +61,30 @@ def readCSV():
 	with open(csv_file, mode='r') as file:
 		reader = csv.reader(file)
 		rowcount = 0
+		usernamelist = []
 		for row in reader:
 			rowcount += 1
 			usernamelist = row
 		if rowcount > 1:
 			print("Error: csv file should only have 1 row")
 			exit(1)
-	
-	# Open log to write warnings for bad emails
-	log = open('log.txt', 'w')
-	for i in range(len(usernamelist)):
-		# if email list expected, check for @gatech.edu
-		if id_type == 'gt_email':
-			user = re.sub(r'@(.*?)$', '', usernamelist[i])
-			if not re.match(r'(.*?)@gatech.edu', usernamelist[i]):
-				print(f"WARNING: Non GT Email skipped: {usernamelist[i]}")
-				log.write(f"WARNING: Non GT Email skipped: {usernamelist[i]}\n")
-				continue
-		# otherwise, just ingest all usernames
-		elif id_type == 'gt_id':
-			user = usernamelist[i]
+	# Drop blank entries (e.g. an empty file or a trailing comma)
+	usernamelist = [u.strip() for u in usernamelist if u.strip()]
+
+	# Start a fresh log for this run and write warnings for bad emails
+	with open('log.txt', 'w') as log:
+		for i in range(len(usernamelist)):
+			# if email list expected, check for @gatech.edu
+			if id_type == 'gt_email':
+				user = re.sub(r'@(.*?)$', '', usernamelist[i])
+				if not re.match(r'(.*?)@gatech.edu', usernamelist[i]):
+					print(f"WARNING: Non GT Email skipped: {usernamelist[i]}")
+					log.write(f"WARNING: Non GT Email skipped: {usernamelist[i]}\n")
+					continue
+			# otherwise, just ingest all usernames
+			elif id_type == 'gt_id':
+				user = usernamelist[i]
 	return usernamelist
-	log.close()
 		
 def addUsersToTeam(user_list, team_name):
 	"""
@@ -119,9 +124,13 @@ def addUsersToTeam(user_list, team_name):
 			# parse json response from Github API
 			data = json.loads(result.stdout)
 			
-			# Write errors if request failed
-			if data.get("message") == "Not Found":
-				error_message = f"ERROR: Couldn't add user {user}"
+			# Write errors if request failed. A successful membership PUT returns
+			# {url, role, state}; every error response carries a "message"
+			# (Not Found, rate limit, bad credentials, ...). Keep the user in
+			# the retry list for all of them.
+			if result.returncode != 0 or "message" in data:
+				reason = data.get("message", f"gh exited with status {result.returncode}")
+				error_message = f"ERROR: Couldn't add user {user} ({reason})"
 				print(error_message)
 				log.write(error_message + '\n')
 				fails += 1
